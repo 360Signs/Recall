@@ -4,6 +4,19 @@ const types={basic:'Question & answer',choice:'Multiple choice',boolean:'True / 
 const starter={version:1,subjects:[{id:'soc',name:'Sociology',color:'#bc9cf1',topics:['Education','Crime & deviance','Research methods']},{id:'bio',name:'Biology',color:'#91d6ac',topics:['Cell biology','Organisation']},{id:'psy',name:'Psychology',color:'#e8b17b',topics:['Memory','Social influence']}],cards:[],attempts:0,correct:0};
 [['soc','Education','What is the hidden curriculum?','The unwritten rules, values and expectations pupils learn through school routines.','basic'],['soc','Crime & deviance','What is the dark figure of crime?','Crime that is not reported to or recorded by the police.','basic'],['bio','Cell biology','Which organelle is the main site of aerobic respiration?','Mitochondrion','choice',['Nucleus','Ribosome','Chloroplast']],['psy','Memory','Working memory is a single, passive store.','False','boolean'],['bio','Cell biology','The movement of water through a partially permeable membrane is called ___.','osmosis','blank'],['psy','Social influence','What is conformity?','A change in behaviour or beliefs as a result of real or imagined group pressure.','basic']].forEach((x,i)=>starter.cards.push({id:uid(),subject:x[0],topic:x[1],q:x[2],a:x[3],type:x[4],options:x[5]||[],star:false,streak:0,created:Date.now()-i*1000}));
 let db=starter;try{const raw=localStorage.getItem(key);if(raw)db=validate(JSON.parse(raw));}catch(e){setTimeout(()=>toast('Could not load saved data. Import a backup if needed.'),200)}
+// Add the revision-sheet deck once, including for existing browser collections.
+const packId='sociology-education-2026-11';
+if(!Array.isArray(db.packs)) db.packs=[];
+if(!db.packs.includes(packId) && Array.isArray(window.RECALL_SOCIOLOGY_PACK)){
+  let soc=db.subjects.find(s=>s.name.toLowerCase()==='sociology');
+  if(!soc){soc={id:uid(),name:'Sociology',color:'#bc9cf1',topics:[]};db.subjects.push(soc)}
+  for(const [topicName,q,a] of window.RECALL_SOCIOLOGY_PACK){
+    if(!soc.topics.includes(topicName))soc.topics.push(topicName);
+    db.cards.push({id:uid(),subject:soc.id,topic:topicName,q,a,type:'basic',options:[],star:false,streak:0,created:Date.now()});
+  }
+  db.packs.push(packId);
+  try{localStorage.setItem(key,JSON.stringify(db))}catch(e){setTimeout(()=>toast('Storage unavailable. Export a backup of these cards.'),200)}
+}
 let selected='',topic='',stars=false,session=null;
 function validate(d){if(!d||d.version!==1||!Array.isArray(d.subjects)||!Array.isArray(d.cards))throw Error('Invalid backup');const ids=new Set();for(const s of d.subjects){if(typeof s.id!=='string'||ids.has(s.id)||typeof s.name!=='string'||!/^#[0-9a-f]{6}$/i.test(s.color)||!Array.isArray(s.topics)||!s.topics.every(t=>typeof t==='string'))throw Error('Invalid subject');ids.add(s.id)}const cardIds=new Set();for(const c of d.cards){if(typeof c.id!=='string'||cardIds.has(c.id)||!ids.has(c.subject)||!Object.hasOwn(types,c.type)||typeof c.q!=='string'||typeof c.a!=='string'||!c.q.trim()||!c.a.trim()||typeof c.topic!=='string'||!Array.isArray(c.options)||!c.options.every(v=>typeof v==='string')||!Number.isFinite(c.created)||!Number.isFinite(c.streak)||c.streak<0)throw Error('Invalid card');if(c.type==='boolean'&&!['True','False'].includes(c.a))throw Error('Invalid true/false answer');if(c.type==='choice'&&(c.options.length<1||new Set([c.a,...c.options].map(normalize)).size!==c.options.length+1))throw Error('Invalid choices');cardIds.add(c.id)}if(!Number.isFinite(d.attempts)||!Number.isFinite(d.correct)||d.correct<0||d.attempts<d.correct)throw Error('Invalid totals');return d}
 function persist(){try{localStorage.setItem(key,JSON.stringify(db));return true}catch(e){toast('Storage is full or unavailable. Export a backup now.');$('.save-dot').textContent='● Changes not saved';return false}}
